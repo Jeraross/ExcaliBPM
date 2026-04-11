@@ -3,7 +3,6 @@ Testes para music_analyzer.key_detect — detecção de tonalidade.
 """
 
 import numpy as np
-import pytest
 
 from music_analyzer.key_detect import (
     ResultadoTonalidade,

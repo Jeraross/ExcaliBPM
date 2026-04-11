@@ -2,8 +2,6 @@
 Testes para music_analyzer.models — dataclass AnaliseMusical.
 """
 
-import pytest
-
 from music_analyzer.models import AnaliseMusical
 
 

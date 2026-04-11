@@ -7,7 +7,6 @@ Os demais testam a lógica de normalização e comportamentos de borda.
 """
 
 import numpy as np
-import pytest
 
 from music_analyzer.bpm import detectar_bpm
 

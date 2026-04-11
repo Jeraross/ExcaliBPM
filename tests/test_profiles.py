@@ -3,7 +3,6 @@ Testes para music_analyzer.profiles — perfis de tonalidade.
 """
 
 import numpy as np
-import pytest
 
 from music_analyzer.profiles import PROFILES, PROFILES_EDM, get_all_profiles
 

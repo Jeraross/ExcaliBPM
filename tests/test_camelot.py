@@ -2,8 +2,6 @@
 Testes para music_analyzer.camelot — lógica da roda Camelot.
 """
 
-import pytest
-
 from music_analyzer.camelot import (
     _distancia_circular,
     compatibilidade,
