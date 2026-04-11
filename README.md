@@ -39,6 +39,7 @@ engine tells you instantly whether two tracks will blend harmonically.
 
 ```
 ExcaliBPM/
+<<<<<<< HEAD
 ├── .github/
 │   ├── labeler.yml
 │   └── workflows/
@@ -53,6 +54,9 @@ ExcaliBPM/
 │   ├── notRight.wav
 │   └── theSpins.wav
 ├── excalibpm/                  # Core package
+=======
+├── music_analyzer/             # Core package
+>>>>>>> 9932ac9735cfcfcc5e731226979777c2647b8ec4
 │   ├── __init__.py             # Public API
 │   ├── core.py                 # Main orchestrator
 │   ├── chroma.py               # Chromagram extraction pipeline
