@@ -1,0 +1,73 @@
+name: Bandit Security Scan
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  schedule:
+    - cron: '0 6 * * 1'  # toda segunda-feira às 06h UTC
+
+jobs:
+  bandit:
+    name: Bandit Python Security Analysis
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit (full scan)
+        run: |
+          bandit -r . \
+            --exclude ./.git,./venv,./.venv,./env,./node_modules,./tests \
+            --severity-level medium \
+            --confidence-level medium \
+            --format json \
+            --output bandit-report.json \
+            --exit-zero
+
+      - name: Show summary in terminal
+        if: always()
+        run: |
+          bandit -r . \
+            --exclude ./.git,./venv,./.venv,./env,./node_modules,./tests \
+            --severity-level medium \
+            --confidence-level medium \
+            --format txt || true
+
+      - name: Upload Bandit JSON report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 30
+
+      - name: Fail if HIGH severity issues found
+        run: |
+          HIGH=$(python3 -c "
+          import json, sys
+          with open('bandit-report.json') as f:
+              data = json.load(f)
+          high = [r for r in data.get('results', []) if r['issue_severity'] == 'HIGH']
+          print(len(high))
+          ")
+          echo "Issues de severidade HIGH encontrados: $HIGH"
+          if [ "$HIGH" -gt "0" ]; then
+            echo "❌ Build falhou: existem $HIGH issue(s) de severidade HIGH!"
+            exit 1
+          else
+            echo "✅ Nenhum issue crítico encontrado."
+          fi
