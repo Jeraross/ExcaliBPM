@@ -1,165 +1,160 @@
 """
-Testes para music_analyzer.camelot — lógica da roda Camelot.
+Tests for music_analyzer.camelot — Camelot wheel logic.
 """
 
 from music_analyzer.camelot import (
-    _distancia_circular,
-    compatibilidade,
-    obter_camelot,
-    obter_openkey,
-    sugerir_proximas,
+    _circular_distance,
+    compatibility,
+    get_camelot,
+    get_openkey,
+    suggest_next,
 )
 
 
-# ── obter_camelot ────────────────────────────────────────────────────────────
+# ── get_camelot ──────────────────────────────────────────────────────────────
 
-class TestObterCamelot:
+class TestGetCamelot:
     def test_c_major(self):
-        assert obter_camelot("C Major") == "8B"
+        assert get_camelot("C Major") == "8B"
 
     def test_a_minor(self):
-        assert obter_camelot("A Minor") == "8A"
+        assert get_camelot("A Minor") == "8A"
 
     def test_f_sharp_major(self):
-        assert obter_camelot("F# Major") == "2B"
+        assert get_camelot("F# Major") == "2B"
 
-    def test_tonalidade_invalida_retorna_none(self):
-        assert obter_camelot("X Qualquer") is None
+    def test_unknown_key_returns_none(self):
+        assert get_camelot("X Unknown") is None
 
-    def test_todas_as_24_tonalidades_mapeadas(self):
-        from music_analyzer.camelot import TOM_PARA_CAMELOT
-        assert len(TOM_PARA_CAMELOT) == 24
+    def test_all_24_keys_mapped(self):
+        from music_analyzer.camelot import KEY_TO_CAMELOT
+        assert len(KEY_TO_CAMELOT) == 24
 
 
-# ── obter_openkey ────────────────────────────────────────────────────────────
+# ── get_openkey ──────────────────────────────────────────────────────────────
 
-class TestObterOpenkey:
+class TestGetOpenkey:
     def test_c_major(self):
-        assert obter_openkey("C Major") == "1d"
+        assert get_openkey("C Major") == "1d"
 
     def test_a_minor(self):
-        assert obter_openkey("A Minor") == "1m"
+        assert get_openkey("A Minor") == "1m"
 
-    def test_tonalidade_invalida_retorna_none(self):
-        assert obter_openkey("Xpto") is None
+    def test_unknown_key_returns_none(self):
+        assert get_openkey("Xpto") is None
 
-    def test_todas_as_24_tonalidades_mapeadas(self):
-        from music_analyzer.camelot import TOM_PARA_OPENKEY
-        assert len(TOM_PARA_OPENKEY) == 24
-
-
-# ── _distancia_circular ──────────────────────────────────────────────────────
-
-class TestDistanciaCircular:
-    def test_mesmos_numeros(self):
-        assert _distancia_circular(5, 5) == 0
-
-    def test_vizinhos(self):
-        assert _distancia_circular(1, 2) == 1
-        assert _distancia_circular(12, 11) == 1
-
-    def test_distancia_maxima_e_seis(self):
-        assert _distancia_circular(1, 7) == 6
-
-    def test_wraparound_circular(self):
-        # 12 e 1 são vizinhos na roda (distância 1)
-        assert _distancia_circular(12, 1) == 1
-
-    def test_simetria(self):
-        assert _distancia_circular(3, 8) == _distancia_circular(8, 3)
+    def test_all_24_keys_mapped(self):
+        from music_analyzer.camelot import KEY_TO_OPENKEY
+        assert len(KEY_TO_OPENKEY) == 24
 
 
-# ── compatibilidade ──────────────────────────────────────────────────────────
+# ── _circular_distance ───────────────────────────────────────────────────────
 
-class TestCompatibilidade:
-    def test_mesma_tonalidade_e_perfeita(self):
-        r = compatibilidade("C Major", "C Major")
-        assert r["nivel"] == "perfeita"
-        assert r["distancia"] == 0
+class TestCircularDistance:
+    def test_same_numbers(self):
+        assert _circular_distance(5, 5) == 0
 
-    def test_relativa_maior_menor_e_perfeita(self):
-        # C Major (8B) e A Minor (8A) — mesmo número, letra diferente
-        r = compatibilidade("C Major", "A Minor")
-        assert r["nivel"] == "perfeita"
-        assert "relativa" in r["descricao"].lower()
+    def test_neighbors(self):
+        assert _circular_distance(1, 2) == 1
+        assert _circular_distance(12, 11) == 1
 
-    def test_vizinha_mesma_letra_e_boa(self):
-        # G Major (9B) é vizinha de C Major (8B)
-        r = compatibilidade("C Major", "G Major")
-        assert r["nivel"] == "boa"
-        assert r["distancia"] == 1
+    def test_maximum_distance_is_six(self):
+        assert _circular_distance(1, 7) == 6
 
-    def test_vizinha_cruzada_e_boa(self):
-        # C Major (8B) e E Minor (9A): dist=1, letras diferentes
-        r = compatibilidade("C Major", "E Minor")
-        assert r["nivel"] == "boa"
-        assert r["distancia"] == 1
+    def test_wraparound(self):
+        # 12 and 1 are neighbors on the wheel (distance 1)
+        assert _circular_distance(12, 1) == 1
 
-    def test_distancia_2_e_arriscada(self):
-        # C Major (8B) e D Major (10B): dist=2
-        r = compatibilidade("C Major", "D Major")
-        assert r["nivel"] == "arriscada"
-        assert r["distancia"] == 2
+    def test_symmetry(self):
+        assert _circular_distance(3, 8) == _circular_distance(8, 3)
 
-    def test_incompativel(self):
-        # C Major (8B) e F# Major (2B): dist=6 — oposto na roda
-        r = compatibilidade("C Major", "F# Major")
-        assert r["nivel"] == "incompativel"
 
-    def test_tonalidade_invalida_retorna_desconhecida(self):
-        r = compatibilidade("X Qualquer", "C Major")
-        assert r["nivel"] == "desconhecida"
-        assert r["distancia"] == -1
+# ── compatibility ────────────────────────────────────────────────────────────
 
-    def test_retorna_codigos_camelot_corretos(self):
-        r = compatibilidade("C Major", "G Major")
+class TestCompatibility:
+    def test_same_key_is_perfect(self):
+        r = compatibility("C Major", "C Major")
+        assert r["level"] == "perfect"
+        assert r["distance"] == 0
+
+    def test_relative_major_minor_is_perfect(self):
+        # C Major (8B) and A Minor (8A) — same number, different letter
+        r = compatibility("C Major", "A Minor")
+        assert r["level"] == "perfect"
+        assert "relative" in r["description"].lower()
+
+    def test_same_letter_neighbor_is_good(self):
+        # G Major (9B) is a neighbor of C Major (8B)
+        r = compatibility("C Major", "G Major")
+        assert r["level"] == "good"
+        assert r["distance"] == 1
+
+    def test_cross_neighbor_is_good(self):
+        # C Major (8B) and E Minor (9A): dist=1, different letters
+        r = compatibility("C Major", "E Minor")
+        assert r["level"] == "good"
+        assert r["distance"] == 1
+
+    def test_distance_2_is_risky(self):
+        # C Major (8B) and D Major (10B): dist=2
+        r = compatibility("C Major", "D Major")
+        assert r["level"] == "risky"
+        assert r["distance"] == 2
+
+    def test_incompatible_keys(self):
+        # C Major (8B) and F# Major (2B): dist=6 — opposite on wheel
+        r = compatibility("C Major", "F# Major")
+        assert r["level"] == "incompatible"
+
+    def test_unknown_key_returns_unknown_level(self):
+        r = compatibility("X Unknown", "C Major")
+        assert r["level"] == "unknown"
+        assert r["distance"] == -1
+
+    def test_camelot_codes_are_correct(self):
+        r = compatibility("C Major", "G Major")
         assert r["camelot_a"] == "8B"
         assert r["camelot_b"] == "9B"
 
-    def test_salto_sete_e_arriscada(self):
-        # 8B (C Major) vs 3B (C# Major): dist=5 — incompatível
-        # Encontrar um par com dist=7 (não existe no módulo 12, máximo é 6)
-        # dist=7 é tratado na lógica mas matematicamente dist_circular ≤ 6;
-        # o branch só é alcançado se dist==7 após _distancia_circular,
-        # o que nunca ocorre. O código é defensivo — verificar que não explode.
-        r = compatibilidade("C Major", "C Major")
+    def test_known_valid_keys_never_raise(self):
+        r = compatibility("C Major", "C Major")
         assert r is not None
 
 
-# ── sugerir_proximas ─────────────────────────────────────────────────────────
+# ── suggest_next ─────────────────────────────────────────────────────────────
 
-class TestSugerirProximas:
-    def test_retorna_lista_nao_vazia_para_tom_valido(self):
-        sugestoes = sugerir_proximas("C Major")
-        assert isinstance(sugestoes, list)
-        assert len(sugestoes) > 0
+class TestSuggestNext:
+    def test_returns_non_empty_list_for_valid_key(self):
+        suggestions = suggest_next("C Major")
+        assert isinstance(suggestions, list)
+        assert len(suggestions) > 0
 
-    def test_retorna_lista_vazia_para_tom_invalido(self):
-        assert sugerir_proximas("Tom Inválido") == []
+    def test_returns_empty_list_for_unknown_key(self):
+        assert suggest_next("Unknown Key") == []
 
-    def test_sugestoes_tem_campos_obrigatorios(self):
-        sugestoes = sugerir_proximas("A Minor")
-        for s in sugestoes:
-            assert "tom" in s
+    def test_suggestions_have_required_fields(self):
+        suggestions = suggest_next("A Minor")
+        for s in suggestions:
+            assert "key" in s
             assert "camelot" in s
-            assert "nivel" in s
-            assert "descricao" in s
+            assert "level" in s
+            assert "description" in s
 
-    def test_relativa_esta_nas_sugestoes(self):
-        # A relativa de C Major é A Minor
-        sugestoes = sugerir_proximas("C Major")
-        toms = [s["tom"] for s in sugestoes]
-        assert "A Minor" in toms
+    def test_relative_key_is_in_suggestions(self):
+        # Relative of C Major is A Minor
+        suggestions = suggest_next("C Major")
+        keys = [s["key"] for s in suggestions]
+        assert "A Minor" in keys
 
-    def test_vizinhas_estao_nas_sugestoes(self):
-        # Vizinhas de C Major (8B): G Major (9B) e F Major (7B)
-        sugestoes = sugerir_proximas("C Major")
-        toms = [s["tom"] for s in sugestoes]
-        assert "G Major" in toms
-        assert "F Major" in toms
+    def test_wheel_neighbors_are_in_suggestions(self):
+        # Neighbors of C Major (8B): G Major (9B) and F Major (7B)
+        suggestions = suggest_next("C Major")
+        keys = [s["key"] for s in suggestions]
+        assert "G Major" in keys
+        assert "F Major" in keys
 
-    def test_nivel_perfeita_e_boa_presentes(self):
-        sugestoes = sugerir_proximas("C Major")
-        niveis = {s["nivel"] for s in sugestoes}
-        assert "perfeita" in niveis
-        assert "boa" in niveis
+    def test_perfect_and_good_levels_present(self):
+        suggestions = suggest_next("C Major")
+        levels = {s["level"] for s in suggestions}
+        assert "perfect" in levels
+        assert "good" in levels

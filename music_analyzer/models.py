@@ -1,87 +1,87 @@
 """
-Modelos de dados para resultados de análise musical.
+Data models for music analysis results.
 """
 
 from dataclasses import dataclass, field
-from .camelot import obter_camelot, obter_openkey
+from .camelot import get_camelot, get_openkey
 
 
 @dataclass
-class AnaliseMusical:
-    """Resultado completo da análise de uma faixa."""
+class MusicAnalysis:
+    """Complete analysis result for a single audio track."""
 
-    # Tonalidade geral
-    tonalidade_geral: str
-    confianca_geral: float
+    # Overall key
+    key: str
+    key_confidence: float
 
-    # Tonalidade no início
-    tonalidade_inicio: str
-    confianca_inicio: float
+    # Key at the start of the track
+    key_start: str
+    start_confidence: float
 
-    # Tonalidade no final
-    tonalidade_final: str
-    confianca_final: float
+    # Key at the end of the track
+    key_end: str
+    end_confidence: float
 
     # BPM
     bpm: float
 
-    # Metadados
-    duracao_segundos: float
-    arquivo: str = ""
+    # Metadata
+    duration_seconds: float
+    file: str = ""
 
-    # Detalhes dos votos (para debug)
-    votos_perfis: dict[str, str] = field(default_factory=dict)
-    votos_frames: list[str] = field(default_factory=list)
+    # Vote details (for debugging)
+    profile_votes: dict[str, str] = field(default_factory=dict)
+    frame_votes: list[str] = field(default_factory=list)
 
     @property
     def camelot(self) -> str:
-        return obter_camelot(self.tonalidade_geral) or "?"
+        return get_camelot(self.key) or "?"
 
     @property
     def openkey(self) -> str:
-        return obter_openkey(self.tonalidade_geral) or "?"
+        return get_openkey(self.key) or "?"
 
     @property
-    def camelot_inicio(self) -> str:
-        return obter_camelot(self.tonalidade_inicio) or "?"
+    def camelot_start(self) -> str:
+        return get_camelot(self.key_start) or "?"
 
     @property
-    def camelot_final(self) -> str:
-        return obter_camelot(self.tonalidade_final) or "?"
+    def camelot_end(self) -> str:
+        return get_camelot(self.key_end) or "?"
 
     def __str__(self) -> str:
-        minutos = int(self.duracao_segundos // 60)
-        segundos = int(self.duracao_segundos % 60)
+        minutes = int(self.duration_seconds // 60)
+        seconds = int(self.duration_seconds % 60)
 
-        linhas = [
+        lines = [
             f"{'═' * 56}",
-            "  ANÁLISE MUSICAL",
-            f"  {self.arquivo}" if self.arquivo else "",
+            "  MUSIC ANALYSIS",
+            f"  {self.file}" if self.file else "",
             f"{'═' * 56}",
-            f"  Duração        : {minutos}:{segundos:02d}",
+            f"  Duration       : {minutes}:{seconds:02d}",
             f"  BPM            : {self.bpm:.1f}",
             f"{'─' * 56}",
-            f"  Tom Geral      : {self.tonalidade_geral:<14} │ {self.camelot:<4} │ {self.confianca_geral:.0%}",
-            f"  Tom Início     : {self.tonalidade_inicio:<14} │ {self.camelot_inicio:<4} │ {self.confianca_inicio:.0%}",
-            f"  Tom Final      : {self.tonalidade_final:<14} │ {self.camelot_final:<4} │ {self.confianca_final:.0%}",
+            f"  Overall Key    : {self.key:<14} │ {self.camelot:<4} │ {self.key_confidence:.0%}",
+            f"  Start Key      : {self.key_start:<14} │ {self.camelot_start:<4} │ {self.start_confidence:.0%}",
+            f"  End Key        : {self.key_end:<14} │ {self.camelot_end:<4} │ {self.end_confidence:.0%}",
             f"{'═' * 56}",
         ]
-        return "\n".join(line for line in linhas if line)
+        return "\n".join(line for line in lines if line)
 
     def to_dict(self) -> dict:
-        """Serialização para JSON."""
+        """Serialize to a JSON-compatible dictionary."""
         return {
-            "arquivo": self.arquivo,
-            "duracao_segundos": round(self.duracao_segundos, 2),
+            "file": self.file,
+            "duration_seconds": round(self.duration_seconds, 2),
             "bpm": self.bpm,
-            "tonalidade_geral": self.tonalidade_geral,
+            "key": self.key,
             "camelot": self.camelot,
             "openkey": self.openkey,
-            "confianca_geral": round(self.confianca_geral, 4),
-            "tonalidade_inicio": self.tonalidade_inicio,
-            "camelot_inicio": self.camelot_inicio,
-            "confianca_inicio": round(self.confianca_inicio, 4),
-            "tonalidade_final": self.tonalidade_final,
-            "camelot_final": self.camelot_final,
-            "confianca_final": round(self.confianca_final, 4),
+            "key_confidence": round(self.key_confidence, 4),
+            "key_start": self.key_start,
+            "camelot_start": self.camelot_start,
+            "start_confidence": round(self.start_confidence, 4),
+            "key_end": self.key_end,
+            "camelot_end": self.camelot_end,
+            "end_confidence": round(self.end_confidence, 4),
         }

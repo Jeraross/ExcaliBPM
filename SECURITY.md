@@ -24,7 +24,7 @@ Use the **GitHub Private Security Advisory**:
 3. Fill in the form with as much detail as possible
 
 > You can access it directly at:  
-> `https://github.com/YOUR_USERNAME/YOUR_REPOSITORY/security/advisories/new`
+> `https://github.com/Jeraross/ExcaliBPM/security/advisories/new`
 
 ---
 

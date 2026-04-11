@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-CLI para análise musical.
+CLI for music analysis.
 
-Uso:
+Usage:
     python main.py track.wav
     python main.py track1.mp3 track2.flac --json
-    python main.py track_a.wav --compativel-com track_b.wav
+    python main.py track_a.wav --compatible-with track_b.wav
 """
 
 import argparse
@@ -14,71 +14,71 @@ import sys
 import os
 
 from music_analyzer import (
-    analisar_musica,
-    compatibilidade,
-    sugerir_proximas,
+    analyze_track,
+    compatibility,
+    suggest_next,
 )
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Análise musical robusta — tonalidade, BPM e compatibilidade Camelot",
+        description="ExcaliBPM — Robust music analysis: key, BPM, and Camelot compatibility",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Exemplos:
-  python main.py musica.wav
+Examples:
+  python main.py track.wav
   python main.py *.mp3 --json
-  python main.py track_a.wav --compativel-com track_b.wav
-  python main.py track.wav --sugestoes
+  python main.py track_a.wav --compatible-with track_b.wav
+  python main.py track.wav --suggestions
         """,
     )
 
     parser.add_argument(
-        "arquivos",
+        "files",
         nargs="+",
-        help="Arquivo(s) de áudio para analisar",
+        help="Audio file(s) to analyze",
     )
     parser.add_argument(
         "--json",
         action="store_true",
-        help="Saída em formato JSON",
+        help="Output in JSON format",
     )
     parser.add_argument(
-        "--compativel-com",
-        metavar="ARQUIVO",
-        help="Verifica compatibilidade harmônica com outro arquivo",
+        "--compatible-with",
+        metavar="FILE",
+        help="Check harmonic compatibility with another file",
     )
     parser.add_argument(
-        "--sugestoes",
+        "--suggestions",
         action="store_true",
-        help="Mostra tons compatíveis para transição (Camelot)",
+        help="Show compatible keys for transition (Camelot)",
     )
     parser.add_argument(
         "--sr",
         type=int,
         default=22050,
-        help="Taxa de amostragem (padrão: 22050)",
+        help="Sample rate (default: 22050)",
     )
     parser.add_argument(
         "--debug",
         action="store_true",
-        help="Mostra votos detalhados de cada perfil",
+        help="Show detailed votes from each profile",
     )
 
     args = parser.parse_args()
 
-    resultados = []
+    results = []
 
-    for arquivo in args.arquivos:
-        if not os.path.exists(arquivo):
-            print(f"Arquivo não encontrado: {arquivo}", file=sys.stderr)
+    for file in args.files:
+        if not os.path.exists(file):
+            print(f"File not found: {file}", file=sys.stderr)
             continue
 
-        print(f"\nAnalisando: {arquivo}...", file=sys.stderr)
+        print(f"\nAnalyzing: {file}...", file=sys.stderr)
 
         try:
-            r = analisar_musica(arquivo, sr=args.sr)
-            resultados.append(r)
+            r = analyze_track(file, sr=args.sr)
+            results.append(r)
 
             if args.json:
                 continue
@@ -86,62 +86,62 @@ Exemplos:
             print(r)
 
             if args.debug:
-                print("\n  Votos por perfil:")
-                for perfil, tom in r.votos_perfis.items():
-                    print(f"    {perfil:<25} → {tom}")
-                if r.votos_frames:
+                print("\n  Profile votes:")
+                for profile, key in r.profile_votes.items():
+                    print(f"    {profile:<25} → {key}")
+                if r.frame_votes:
                     from collections import Counter
-                    contagem = Counter(r.votos_frames)
-                    print(f"\n  Votos por frame ({len(r.votos_frames)} segmentos):")
-                    for tom, n in contagem.most_common(5):
-                        barra = "█" * n
-                        print(f"    {tom:<14} {barra} ({n})")
+                    count = Counter(r.frame_votes)
+                    print(f"\n  Frame votes ({len(r.frame_votes)} segments):")
+                    for key, n in count.most_common(5):
+                        bar = "█" * n
+                        print(f"    {key:<14} {bar} ({n})")
 
-            if args.sugestoes:
-                sug = sugerir_proximas(r.tonalidade_geral)
-                print(f"\n  Tons compatíveis para transição a partir de {r.tonalidade_geral} ({r.camelot}):")
-                for s in sug:
-                    print(f"    {s['camelot']:<5} {s['tom']:<14} — {s['descricao']} [{s['nivel']}]")
+            if args.suggestions:
+                suggestions = suggest_next(r.key)
+                print(f"\n  Compatible keys for transition from {r.key} ({r.camelot}):")
+                for s in suggestions:
+                    print(f"    {s['camelot']:<5} {s['key']:<14} — {s['description']} [{s['level']}]")
 
         except Exception as e:
-            print(f"Erro ao analisar {arquivo}: {e}", file=sys.stderr)
+            print(f"Error analyzing {file}: {e}", file=sys.stderr)
 
-    # Compatibilidade entre duas faixas
-    if args.compativel_com and resultados:
-        print(f"\nAnalisando: {args.compativel_com}...", file=sys.stderr)
+    # Compatibility between two tracks
+    if args.compatible_with and results:
+        print(f"\nAnalyzing: {args.compatible_with}...", file=sys.stderr)
         try:
-            r_b = analisar_musica(args.compativel_com, sr=args.sr)
+            r_b = analyze_track(args.compatible_with, sr=args.sr)
             if not args.json:
                 print(r_b)
 
-            r_a = resultados[0]
+            r_a = results[0]
 
-            compat = compatibilidade(r_a.tonalidade_final, r_b.tonalidade_inicio)
+            compat = compatibility(r_a.key_end, r_b.key_start)
 
             if args.json:
-                resultados.append(r_b)
+                results.append(r_b)
             else:
                 print(f"\n{'─' * 56}")
-                print("  COMPATIBILIDADE PARA TRANSIÇÃO")
+                print("  TRANSITION COMPATIBILITY")
                 print(f"{'─' * 56}")
-                print(f"  {r_a.arquivo}")
-                print(f"    Tom final: {r_a.tonalidade_final} ({r_a.camelot_final})")
-                print(f"  {r_b.arquivo}")
-                print(f"    Tom início: {r_b.tonalidade_inicio} ({r_b.camelot_inicio})")
+                print(f"  {r_a.file}")
+                print(f"    End key:   {r_a.key_end} ({r_a.camelot_end})")
+                print(f"  {r_b.file}")
+                print(f"    Start key: {r_b.key_start} ({r_b.camelot_start})")
                 print(f"{'─' * 56}")
-                emoji = {"perfeita": "✓", "boa": "~", "arriscada": "!", "incompativel": "✗"}
-                e = emoji.get(compat["nivel"], "?")
-                print(f"  [{e}] {compat['nivel'].upper()} — {compat['descricao']}")
-                print(f"  Distância Camelot: {compat['distancia']}")
+                emoji = {"perfect": "✓", "good": "~", "risky": "!", "incompatible": "✗"}
+                e = emoji.get(compat["level"], "?")
+                print(f"  [{e}] {compat['level'].upper()} — {compat['description']}")
+                print(f"  Camelot distance: {compat['distance']}")
                 print(f"{'─' * 56}")
 
         except Exception as e:
-            print(f"Erro ao analisar {args.compativel_com}: {e}", file=sys.stderr)
+            print(f"Error analyzing {args.compatible_with}: {e}", file=sys.stderr)
 
-    # Saída JSON
+    # JSON output
     if args.json:
-        dados = [r.to_dict() for r in resultados]
-        print(json.dumps(dados, indent=2, ensure_ascii=False))
+        data = [r.to_dict() for r in results]
+        print(json.dumps(data, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

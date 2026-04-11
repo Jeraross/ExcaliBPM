@@ -12,6 +12,8 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +54,7 @@ jobs:
         with:
           body_path: CHANGELOG_RELEASE.md
           tag_name: ${{ github.ref_name }}
-          name: "Music Analyzer ${{ github.ref_name }}"
+          name: "ExcaliBPM ${{ github.ref_name }}"
           draft: false
           prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
         env:

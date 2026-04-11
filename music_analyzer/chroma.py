@@ -1,12 +1,12 @@
 """
-Pipeline de extração de cromagrama otimizado para detecção de tonalidade.
+Optimized chroma extraction pipeline for key detection.
 
-Implementa as melhores práticas da literatura:
-- Separação harmônica agressiva (HPSS margin=8)
-- CQT com 36 bins/oitava (3 por semitom)
-- Correção automática de afinação
-- Filtragem não-local + mediana temporal
-- Ponderação por energia (RMS)
+Implements best practices from the literature:
+- Aggressive harmonic separation (HPSS margin=8)
+- CQT with 36 bins/octave (3 per semitone)
+- Automatic tuning correction
+- Non-local filtering + temporal median
+- Energy weighting (RMS)
 """
 
 import numpy as np
@@ -14,43 +14,43 @@ import scipy.ndimage
 import librosa
 
 
-def extrair_harmonico(y: np.ndarray, margin: int = 8) -> np.ndarray:
+def extract_harmonic(y: np.ndarray, margin: int = 8) -> np.ndarray:
     """
-    Isola o conteúdo harmônico do áudio via HPSS.
+    Isolate the harmonic content of the audio via HPSS.
 
-    margin=8 é agressivo — suprime quase toda percussão e ruído,
-    preservando melodia, acordes e linhas de baixo. Ideal para
-    análise de tonalidade onde percussão polui o cromagrama.
+    margin=8 is aggressive — suppresses nearly all percussion and noise
+    while preserving melody, chords, and bass lines. Ideal for key
+    detection where percussion pollutes the chroma.
     """
     return librosa.effects.harmonic(y=y, margin=margin)
 
 
-def estimar_afinacao(y: np.ndarray, sr: int) -> float:
+def estimate_tuning(y: np.ndarray, sr: int) -> float:
     """
-    Estima o desvio de afinação do áudio em relação a A440.
+    Estimate the tuning deviation of the audio relative to A440.
 
-    Muitas gravações estão levemente desafinadas (± 10-50 cents).
-    Sem correção, a energia cromática vaza para bins adjacentes,
-    reduzindo a precisão da detecção de tom.
+    Many recordings are slightly out of tune (±10-50 cents).
+    Without correction, chroma energy leaks into adjacent bins,
+    reducing key detection accuracy.
     """
     return librosa.estimate_tuning(y=y, sr=sr, n_fft=8192)
 
 
-def extrair_chroma_cqt(
+def extract_chroma_cqt(
     y: np.ndarray,
     sr: int,
     hop_length: int = 512,
     tuning: float | None = None,
 ) -> np.ndarray:
     """
-    Extrai cromagrama via Constant-Q Transform com parâmetros otimizados.
+    Extract chroma via Constant-Q Transform with optimized parameters.
 
-    bins_per_octave=36 (3 bins/semitom) melhora significativamente a
-    resolução em baixas frequências, reduzindo vazamento de energia
-    entre notas próximas — especialmente entre tônica e dominante.
+    bins_per_octave=36 (3 bins/semitone) significantly improves
+    resolution at low frequencies, reducing energy leakage between
+    nearby notes — especially between tonic and dominant.
     """
     if tuning is None:
-        tuning = estimar_afinacao(y, sr)
+        tuning = estimate_tuning(y, sr)
 
     chroma = librosa.feature.chroma_cqt(
         y=y,
@@ -66,87 +66,88 @@ def extrair_chroma_cqt(
     return chroma
 
 
-def extrair_chroma_cens(
+def extract_chroma_cens(
     y: np.ndarray,
     sr: int,
     hop_length: int = 512,
 ) -> np.ndarray:
     """
-    Extrai cromagrama CENS — mais robusto a variações de timbre
-    e qualidade de gravação, porém menos preciso para distinguir
-    tônica de dominante. Usado como segundo votante no ensemble.
+    Extract CENS chroma — more robust to timbre variations and
+    recording quality, but less precise for distinguishing tonic
+    from dominant. Used as a secondary voter in the ensemble.
     """
     return librosa.feature.chroma_cens(y=y, sr=sr, hop_length=hop_length)
 
 
-def filtrar_chroma(chroma: np.ndarray) -> np.ndarray:
+def filter_chroma(chroma: np.ndarray) -> np.ndarray:
     """
-    Aplica filtragem em dois estágios:
+    Apply two-stage filtering:
 
-    1. Non-local filtering (nn_filter): suprime ruídos esparsos
-       comparando cada frame com vizinhos via similaridade cosseno.
-    2. Mediana temporal (kernel 9): suaviza flutuações rápidas
-       preservando bordas (transições de acorde).
+    1. Non-local filtering (nn_filter): suppresses sparse noise by
+       comparing each frame with neighbors via cosine similarity.
+    2. Temporal median (kernel 9): smooths rapid fluctuations while
+       preserving edges (chord transitions).
     """
-    chroma_filtrado = np.minimum(
+    filtered = np.minimum(
         chroma,
         librosa.decompose.nn_filter(
             chroma, aggregate=np.median, metric="cosine"
         ),
     )
-    chroma_filtrado = scipy.ndimage.median_filter(chroma_filtrado, size=(1, 9))
-    return chroma_filtrado
+    filtered = scipy.ndimage.median_filter(filtered, size=(1, 9))
+    return filtered
 
 
-def ponderar_por_energia(
+def weight_by_energy(
     chroma: np.ndarray,
     y: np.ndarray,
     sr: int,
     hop_length: int = 512,
 ) -> np.ndarray:
     """
-    Pondera cada frame do cromagrama pela energia RMS do áudio.
+    Weight each chroma frame by the RMS energy of the audio.
 
-    Garante que trechos altos (refrão, drops) contribuam mais para
-    a estimativa de tom do que intros silenciosas ou bridges suaves.
+    Ensures loud sections (chorus, drops) contribute more to the
+    key estimate than silent intros or soft bridges.
     """
     rms = librosa.feature.rms(y=y, hop_length=hop_length)[0]
     n = min(chroma.shape[1], len(rms))
     return chroma[:, :n] * rms[:n][np.newaxis, :]
 
 
-def pipeline_chroma(
+def chroma_pipeline(
     y: np.ndarray,
     sr: int,
     hop_length: int = 512,
 ) -> dict[str, np.ndarray]:
     """
-    Pipeline completo de extração de cromagrama.
+    Full chroma extraction pipeline.
 
-    Retorna um dicionário com:
-    - 'cqt': chroma CQT filtrado e ponderado (principal)
-    - 'cens': chroma CENS ponderado (secundário para ensemble)
-    - 'y_harmonic': sinal harmônico isolado
-    - 'tuning': desvio de afinação estimado
+    Returns a dictionary with:
+    - 'cqt': filtered and energy-weighted CQT chroma (primary)
+    - 'cens': energy-weighted CENS chroma (secondary for ensemble)
+    - 'cqt_raw': filtered CQT chroma before energy weighting
+    - 'y_harmonic': isolated harmonic signal
+    - 'tuning': estimated tuning deviation
     """
-    # 1. Separação harmônica agressiva
-    y_harmonic = extrair_harmonico(y, margin=8)
+    # 1. Aggressive harmonic separation
+    y_harmonic = extract_harmonic(y, margin=8)
 
-    # 2. Estimativa de afinação
-    tuning = estimar_afinacao(y_harmonic, sr)
+    # 2. Tuning estimation
+    tuning = estimate_tuning(y_harmonic, sr)
 
-    # 3. Chroma CQT (principal)
-    chroma_cqt = extrair_chroma_cqt(y_harmonic, sr, hop_length, tuning)
-    chroma_cqt = filtrar_chroma(chroma_cqt)
-    chroma_cqt_w = ponderar_por_energia(chroma_cqt, y, sr, hop_length)
+    # 3. CQT chroma (primary)
+    chroma_cqt = extract_chroma_cqt(y_harmonic, sr, hop_length, tuning)
+    chroma_cqt = filter_chroma(chroma_cqt)
+    chroma_cqt_weighted = weight_by_energy(chroma_cqt, y, sr, hop_length)
 
-    # 4. Chroma CENS (votante secundário)
-    chroma_cens = extrair_chroma_cens(y_harmonic, sr, hop_length)
-    chroma_cens_w = ponderar_por_energia(chroma_cens, y, sr, hop_length)
+    # 4. CENS chroma (secondary voter)
+    chroma_cens = extract_chroma_cens(y_harmonic, sr, hop_length)
+    chroma_cens_weighted = weight_by_energy(chroma_cens, y, sr, hop_length)
 
     return {
-        "cqt": chroma_cqt_w,
-        "cens": chroma_cens_w,
+        "cqt": chroma_cqt_weighted,
+        "cens": chroma_cens_weighted,
         "cqt_raw": chroma_cqt,
         "y_harmonic": y_harmonic,
         "tuning": tuning,

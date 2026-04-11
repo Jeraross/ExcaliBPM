@@ -1,4 +1,4 @@
-# Music Analyzer
+# ExcaliBPM
 
 A high-precision audio analysis library built to help DJs make better mixing decisions.
 Developed by **Jera**.
@@ -8,7 +8,7 @@ Developed by **Jera**.
 ## What It Does
 
 Getting a key detection wrong in a DJ set means a clashing transition in front of a live audience.
-This library was built to solve that — combining multiple musicological profiling techniques,
+ExcaliBPM was built to solve that — combining multiple musicological profiling techniques,
 frame-level voting, and harmonic bass analysis to produce accurate key and BPM readings that
 DJs can actually trust.
 
@@ -38,19 +38,40 @@ engine tells you instantly whether two tracks will blend harmonically.
 ## Project Structure
 
 ```
-music_analyzer/
-├── main.py                 # Command-line interface
+ExcaliBPM/
+├── .github/
+│   ├── labeler.yml
+│   └── workflows/
+│       ├── auto-label.yml      # Automatic PR labeling
+│       ├── benchmark.yml       # Performance regression check on PRs
+│       ├── ci.yml              # Lint + test matrix (Python 3.10–3.12)
+│       ├── release.yml         # GitHub Release on version tags
+│       ├── security.yml        # CodeQL static analysis
+│       └── stale.yml           # Auto-close inactive issues/PRs
+├── Musics/                     # Sample audio files for manual testing
+│   ├── Runaway.wav
+│   ├── notRight.wav
+│   └── theSpins.wav
+├── music_analyzer/             # Core package
+│   ├── __init__.py             # Public API
+│   ├── core.py                 # Main orchestrator
+│   ├── chroma.py               # Chromagram extraction pipeline
+│   ├── key_detect.py           # Key detection algorithms
+│   ├── bpm.py                  # BPM detection
+│   ├── camelot.py              # Camelot Wheel + compatibility engine
+│   ├── models.py               # Result dataclasses
+│   └── profiles.py             # 8 key profile sets
+├── tests/                      # Test suite
+│   ├── conftest.py             # Shared fixtures (synthetic chroma, sample analysis)
+│   ├── test_bpm.py
+│   ├── test_camelot.py
+│   ├── test_key_detect.py
+│   ├── test_models.py
+│   └── test_profiles.py
+├── main.py                     # Command-line interface
 ├── requirements.txt
 ├── README.md
-└── music_analyzer/
-    ├── __init__.py         # Public API
-    ├── core.py             # Main orchestrator
-    ├── chroma.py           # Chromagram extraction
-    ├── key_detect.py       # Key detection algorithms
-    ├── bpm.py              # BPM detection
-    ├── camelot.py          # Camelot Wheel + compatibility engine
-    ├── models.py           # Result dataclasses
-    └── profiles.py         # 8 tonality profile sets
+└── SECURITY.md
 ```
 
 ---
@@ -87,25 +108,25 @@ python main.py track.wav --debug
 ## Library Usage
 
 ```python
-from music_analyzer import analisar_musica, compatibilidade, sugerir_proximas
+from music_analyzer import analyze_track, compatibility, suggest_next
 
 # Full analysis
-result = analisar_musica("track.wav")
+result = analyze_track("track.wav")
 print(result)
 print(result.to_dict())  # Ready for JSON / API responses
 
 # Check compatibility for a transition
-track_a = analisar_musica("track_a.wav")
-track_b = analisar_musica("track_b.wav")
+track_a = analyze_track("track_a.wav")
+track_b = analyze_track("track_b.wav")
 
-compat = compatibilidade(track_a.tonalidade_final, track_b.tonalidade_inicio)
+compat = compatibility(track_a.key_end, track_b.key_start)
 print(compat)
-# {'nivel': 'boa', 'descricao': 'Neighbor on the Camelot Wheel (+1)', ...}
+# {'level': 'good', 'description': 'Camelot wheel neighbor (±1)', ...}
 
 # Suggest what to play next
-suggestions = sugerir_proximas(track_a.tonalidade_geral)
+suggestions = suggest_next(track_a.key)
 for s in suggestions:
-    print(f"{s['camelot']}  {s['tom']}  —  {s['nivel']}")
+    print(f"{s['camelot']}  {s['key']}  —  {s['level']}")
 ```
 
 ---
@@ -114,15 +135,15 @@ for s in suggestions:
 
 ```
 ════════════════════════════════════════════════════════
-  ANALYSIS RESULT
+  MUSIC ANALYSIS
   theSpins.wav
 ════════════════════════════════════════════════════════
   Duration       : 3:15
   BPM            : 126.0
 ────────────────────────────────────────────────────────
   Overall Key    : A Minor        │ 8A   │ 75%
-  Opening Key    : A Minor        │ 8A   │ 62%
-  Closing Key    : A Minor        │ 8A   │ 68%
+  Start Key      : A Minor        │ 8A   │ 62%
+  End Key        : A Minor        │ 8A   │ 68%
 ════════════════════════════════════════════════════════
 ```
 
@@ -134,29 +155,29 @@ for s in suggestions:
 
 ```python
 import json
-result = analisar_musica("track.wav")
+result = analyze_track("track.wav")
 print(json.dumps(result.to_dict(), indent=2))
 ```
 
 ```json
 {
-  "arquivo": "track.wav",
+  "file": "track.wav",
   "bpm": 126.0,
-  "tonalidade_geral": "A Minor",
+  "key": "A Minor",
   "camelot": "8A",
   "openkey": "1m",
-  "confianca_geral": 0.75,
-  "tonalidade_inicio": "A Minor",
-  "tonalidade_final": "A Minor"
+  "key_confidence": 0.75,
+  "key_start": "A Minor",
+  "key_end": "A Minor"
 }
 ```
 
-To evaluate whether two tracks will transition cleanly, compare the **closing key**
-of the outgoing track against the **opening key** of the incoming one:
+To evaluate whether two tracks will transition cleanly, compare the **end key**
+of the outgoing track against the **start key** of the incoming one:
 
 ```python
-compat = compatibilidade(outgoing.tonalidade_final, incoming.tonalidade_inicio)
-if compat["nivel"] in ("perfeita", "boa"):
+compat = compatibility(outgoing.key_end, incoming.key_start)
+if compat["level"] in ("perfect", "good"):
     print("Safe harmonic transition.")
 ```
 

@@ -1,28 +1,28 @@
 """
-Music Analyzer — Detecção robusta de tonalidade e BPM para mixagem.
+ExcaliBPM — Robust key and BPM detection for DJ mixing.
 
-Uso rápido:
-    from music_analyzer import analisar_musica, compatibilidade, sugerir_proximas
+Quick usage:
+    from music_analyzer import analyze_track, compatibility, suggest_next
 
-    resultado = analisar_musica("track.wav")
-    print(resultado)
+    result = analyze_track("track.wav")
+    print(result)
 
-    compat = compatibilidade(resultado.tonalidade_geral, "A Minor")
+    compat = compatibility(result.key, "A Minor")
     print(compat)
 """
 
-from .core import analisar_musica, analisar_lote
-from .models import AnaliseMusical
-from .camelot import compatibilidade, sugerir_proximas, obter_camelot, obter_openkey
+from .core import analyze_track, analyze_batch
+from .models import MusicAnalysis
+from .camelot import compatibility, suggest_next, get_camelot, get_openkey
 
 __all__ = [
-    "analisar_musica",
-    "analisar_lote",
-    "AnaliseMusical",
-    "compatibilidade",
-    "sugerir_proximas",
-    "obter_camelot",
-    "obter_openkey",
+    "analyze_track",
+    "analyze_batch",
+    "MusicAnalysis",
+    "compatibility",
+    "suggest_next",
+    "get_camelot",
+    "get_openkey",
 ]
 
 __version__ = "1.0.0"

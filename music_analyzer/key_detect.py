@@ -1,12 +1,12 @@
 """
-Motor de detecção de tonalidade musical.
+Musical key detection engine.
 
-Combina múltiplas estratégias para máxima precisão:
-1. Correlação de Pearson com 7 conjuntos de perfis
-2. Votação por ensemble (maioria entre perfis)
-3. Votação frame-a-frame (segmentos de ~4s)
-4. Análise de endpoints (início/fim da música)
-5. Análise de registro grave para desambiguação de tônica
+Combines multiple strategies for maximum accuracy:
+1. Pearson correlation with 7 profile sets
+2. Ensemble voting (majority across profiles)
+3. Frame-by-frame voting (~4s segments)
+4. Endpoint analysis (start/end of track)
+5. Bass register analysis for tonic disambiguation
 """
 
 import numpy as np
@@ -15,30 +15,30 @@ from dataclasses import dataclass
 
 from .profiles import get_all_profiles
 
-NOTAS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
-# Relações entre tons relativos (maior -> menor relativo)
-_RELATIVOS = {
+# Relative key relationships (major → relative minor)
+_RELATIVES = {
     "C Major": "A Minor", "G Major": "E Minor", "D Major": "B Minor",
     "A Major": "F# Minor", "E Major": "C# Minor", "B Major": "G# Minor",
     "F# Major": "D# Minor", "C# Major": "A# Minor", "G# Major": "F Minor",
     "D# Major": "C Minor", "A# Major": "G Minor", "F Major": "D Minor",
 }
-_RELATIVOS.update({v: k for k, v in _RELATIVOS.items()})
+_RELATIVES.update({v: k for k, v in _RELATIVES.items()})
 
 
 @dataclass
-class ResultadoTonalidade:
-    """Resultado detalhado da detecção de tonalidade."""
-    tom: str
-    confianca: float
-    correlacoes: dict[str, float]
-    votos_perfis: dict[str, str]
-    votos_frames: list[str] | None = None
+class KeyResult:
+    """Detailed result from key detection."""
+    key: str
+    confidence: float
+    correlations: dict[str, float]
+    profile_votes: dict[str, str]
+    frame_votes: list[str] | None = None
 
 
-def _pearson_correlacao(x: np.ndarray, y: np.ndarray) -> float:
-    """Correlação de Pearson entre dois vetores."""
+def _pearson_correlation(x: np.ndarray, y: np.ndarray) -> float:
+    """Pearson correlation between two vectors."""
     x_c = x - np.mean(x)
     y_c = y - np.mean(y)
     num = np.dot(x_c, y_c)
@@ -48,260 +48,257 @@ def _pearson_correlacao(x: np.ndarray, y: np.ndarray) -> float:
     return num / den
 
 
-def _euclidiana_similaridade(x: np.ndarray, y: np.ndarray) -> float:
-    """Similaridade baseada em distância euclidiana (invertida)."""
+def _euclidean_similarity(x: np.ndarray, y: np.ndarray) -> float:
+    """Similarity based on Euclidean distance (inverted)."""
     x_n = x / (np.linalg.norm(x) + 1e-12)
     y_n = y / (np.linalg.norm(y) + 1e-12)
     dist = np.linalg.norm(x_n - y_n)
     return 1.0 / (1.0 + dist)
 
 
-def detectar_com_perfil(
+def detect_with_profile(
     chroma_vec: np.ndarray,
-    perfil_major: np.ndarray,
-    perfil_minor: np.ndarray,
-    usar_euclidiana: bool = False,
+    profile_major: np.ndarray,
+    profile_minor: np.ndarray,
+    use_euclidean: bool = False,
 ) -> tuple[str, float, dict[str, float]]:
     """
-    Detecção K-S com um único par de perfis.
+    K-S detection with a single profile pair.
 
-    Testa as 24 tonalidades possíveis (12 maiores + 12 menores)
-    rotacionando os perfis e calculando a correlação com o cromagrama.
+    Tests all 24 possible keys (12 major + 12 minor) by rotating
+    the profiles and computing correlation against the chroma vector.
     """
-    func = _euclidiana_similaridade if usar_euclidiana else _pearson_correlacao
-    correlacoes: dict[str, float] = {}
+    func = _euclidean_similarity if use_euclidean else _pearson_correlation
+    correlations: dict[str, float] = {}
 
     for i in range(12):
-        maj_rot = np.roll(perfil_major, i)
-        min_rot = np.roll(perfil_minor, i)
+        major_rot = np.roll(profile_major, i)
+        minor_rot = np.roll(profile_minor, i)
 
-        correlacoes[f"{NOTAS[i]} Major"] = func(chroma_vec, maj_rot)
-        correlacoes[f"{NOTAS[i]} Minor"] = func(chroma_vec, min_rot)
+        correlations[f"{NOTES[i]} Major"] = func(chroma_vec, major_rot)
+        correlations[f"{NOTES[i]} Minor"] = func(chroma_vec, minor_rot)
 
-    ranking = sorted(correlacoes.items(), key=lambda x: x[1], reverse=True)
-    melhor_tom, melhor_corr = ranking[0]
-    segundo_corr = ranking[1][1]
+    ranking = sorted(correlations.items(), key=lambda x: x[1], reverse=True)
+    best_key, best_corr = ranking[0]
+    second_corr = ranking[1][1]
 
-    # Confiança: distância relativa entre 1º e 2º lugar
-    gap = melhor_corr - segundo_corr
-    confianca = min(1.0, max(0.0, gap / (abs(melhor_corr) + 1e-10) * 3.0))
+    # Confidence: relative distance between 1st and 2nd place
+    gap = best_corr - second_corr
+    confidence = min(1.0, max(0.0, gap / (abs(best_corr) + 1e-10) * 3.0))
 
-    return melhor_tom, confianca, correlacoes
+    return best_key, confidence, correlations
 
 
-def ensemble_votar(
+def ensemble_vote(
     chroma_vec: np.ndarray,
-    perfis: dict[str, dict[str, np.ndarray]] | None = None,
-) -> ResultadoTonalidade:
+    profiles: dict[str, dict[str, np.ndarray]] | None = None,
+) -> KeyResult:
     """
-    Votação por ensemble: cada conjunto de perfis vota independentemente,
-    o tom mais votado vence. Em caso de empate, usa a maior correlação média.
+    Ensemble voting: each profile set votes independently,
+    and the most-voted key wins. Ties are broken by highest
+    average correlation.
     """
-    if perfis is None:
-        perfis = get_all_profiles()
+    if profiles is None:
+        profiles = get_all_profiles()
 
-    votos: list[str] = []
-    votos_por_perfil: dict[str, str] = {}
-    todas_correlacoes: dict[str, list[float]] = {}
+    votes: list[str] = []
+    votes_by_profile: dict[str, str] = {}
+    all_correlations: dict[str, list[float]] = {}
 
-    for nome, modos in perfis.items():
-        usar_euc = nome == "albrecht_shanahan"
-        tom, conf, corrs = detectar_com_perfil(
-            chroma_vec, modos["major"], modos["minor"], usar_euclidiana=usar_euc
+    for name, modes in profiles.items():
+        use_euc = name == "albrecht_shanahan"
+        key, conf, corrs = detect_with_profile(
+            chroma_vec, modes["major"], modes["minor"], use_euclidean=use_euc
         )
-        votos.append(tom)
-        votos_por_perfil[nome] = tom
+        votes.append(key)
+        votes_by_profile[name] = key
 
         for k, v in corrs.items():
-            todas_correlacoes.setdefault(k, []).append(v)
+            all_correlations.setdefault(k, []).append(v)
 
-    # Correlação média para cada tom (usado em desempate)
-    media_corr = {k: np.mean(v) for k, v in todas_correlacoes.items()}
+    # Average correlation per key (used for tie-breaking)
+    avg_corr = {k: np.mean(v) for k, v in all_correlations.items()}
 
-    contagem = Counter(votos)
-    max_votos = contagem.most_common(1)[0][1]
-    empatados = [t for t, c in contagem.items() if c == max_votos]
+    count = Counter(votes)
+    max_votes = count.most_common(1)[0][1]
+    tied = [k for k, c in count.items() if c == max_votes]
 
-    if len(empatados) == 1:
-        vencedor = empatados[0]
+    if len(tied) == 1:
+        winner = tied[0]
     else:
-        # Desempate pela maior correlação média
-        vencedor = max(empatados, key=lambda t: media_corr.get(t, 0))
+        # Tie-break by highest average correlation
+        winner = max(tied, key=lambda k: avg_corr.get(k, 0))
 
-    # Confiança do ensemble: proporção de votos do vencedor
-    confianca = max_votos / len(votos)
+    # Ensemble confidence: proportion of votes for the winner
+    confidence = max_votes / len(votes)
 
-    return ResultadoTonalidade(
-        tom=vencedor,
-        confianca=confianca,
-        correlacoes=media_corr,
-        votos_perfis=votos_por_perfil,
+    return KeyResult(
+        key=winner,
+        confidence=confidence,
+        correlations=avg_corr,
+        profile_votes=votes_by_profile,
     )
 
 
-def votacao_por_frames(
+def frame_vote(
     chroma: np.ndarray,
     sr: int,
     hop_length: int = 512,
-    duracao_segmento: float = 4.0,
+    segment_duration: float = 4.0,
     rms: np.ndarray | None = None,
-    limiar_silencio: float = 0.01,
-) -> ResultadoTonalidade:
+    silence_threshold: float = 0.01,
+) -> KeyResult:
     """
-    Divide o cromagrama em segmentos de ~4s, detecta o tom de cada um
-    e faz votação por maioria. Descarta segmentos silenciosos.
+    Split the chroma matrix into ~4s segments, detect the key of each,
+    and vote by majority. Silent segments are discarded.
 
-    Mais robusto que a média global porque modulações ou bridges
-    longos não distorcem o resultado.
+    More robust than a global average because long modulations or
+    bridges do not distort the result.
     """
-    frames_por_seg = int(duracao_segmento * sr / hop_length)
+    frames_per_segment = int(segment_duration * sr / hop_length)
     total_frames = chroma.shape[1]
-    perfis = get_all_profiles()
+    profiles = get_all_profiles()
 
-    votos: list[str] = []
+    votes: list[str] = []
 
-    for inicio in range(0, total_frames - frames_por_seg // 2, frames_por_seg):
-        fim = min(inicio + frames_por_seg, total_frames)
-        seg = chroma[:, inicio:fim]
+    for start in range(0, total_frames - frames_per_segment // 2, frames_per_segment):
+        end = min(start + frames_per_segment, total_frames)
+        segment = chroma[:, start:end]
 
-        # Filtra silêncio
+        # Filter silence
         if rms is not None:
-            rms_seg = rms[inicio:min(fim, len(rms))]
-            if len(rms_seg) > 0 and np.mean(rms_seg) < limiar_silencio:
+            rms_seg = rms[start:min(end, len(rms))]
+            if len(rms_seg) > 0 and np.mean(rms_seg) < silence_threshold:
                 continue
 
-        chroma_medio = np.mean(seg, axis=1)
-        if np.linalg.norm(chroma_medio) < 1e-10:
+        chroma_mean = np.mean(segment, axis=1)
+        if np.linalg.norm(chroma_mean) < 1e-10:
             continue
 
-        resultado = ensemble_votar(chroma_medio, perfis)
-        votos.append(resultado.tom)
+        result = ensemble_vote(chroma_mean, profiles)
+        votes.append(result.key)
 
-    if not votos:
-        return ResultadoTonalidade(
-            tom="Indeterminado", confianca=0.0,
-            correlacoes={}, votos_perfis={}, votos_frames=votos,
+    if not votes:
+        return KeyResult(
+            key="Undetermined", confidence=0.0,
+            correlations={}, profile_votes={}, frame_votes=votes,
         )
 
-    contagem = Counter(votos)
-    vencedor, n_votos = contagem.most_common(1)[0]
-    confianca = n_votos / len(votos)
+    count = Counter(votes)
+    winner, n_votes = count.most_common(1)[0]
+    confidence = n_votes / len(votes)
 
-    return ResultadoTonalidade(
-        tom=vencedor, confianca=confianca,
-        correlacoes={}, votos_perfis={}, votos_frames=votos,
+    return KeyResult(
+        key=winner, confidence=confidence,
+        correlations={}, profile_votes={}, frame_votes=votes,
     )
 
 
-def analisar_bass_register(
+def analyze_bass_register(
     y: np.ndarray,
     sr: int,
     hop_length: int = 512,
 ) -> np.ndarray:
     """
-    Extrai cromagrama apenas do registro grave (< ~300 Hz).
+    Extract chroma only from the bass register (< ~300 Hz).
 
-    A nota mais frequente no baixo em pontos cadenciais é muito
-    provavelmente a tônica. Ajuda a desambiguar C Major vs A Minor.
+    The most frequent note in the bass at cadential points is very
+    likely the tonic. Helps disambiguate C Major vs A Minor.
     """
-    # Filtra frequências acima de 300 Hz com passa-baixa
     import librosa
 
-    # Usa CQT limitado ao registro grave (C1 a D#3 ≈ 32-311 Hz)
+    # CQT limited to the bass register (C1 to D#3 ≈ 32-311 Hz)
     S = np.abs(librosa.cqt(
         y=y, sr=sr, hop_length=hop_length,
         fmin=librosa.note_to_hz("C1"),
-        n_bins=36,  # 3 oitavas × 12 bins
+        n_bins=36,  # 3 octaves × 12 bins
         bins_per_octave=12,
     ))
 
-    # Mapeia para 12 classes de altura (chroma do baixo)
-    chroma_bass = np.zeros((12, S.shape[1]))
+    # Map to 12 pitch classes (bass chroma)
+    bass_chroma = np.zeros((12, S.shape[1]))
     for i in range(S.shape[0]):
-        chroma_bass[i % 12] += S[i]
+        bass_chroma[i % 12] += S[i]
 
-    return chroma_bass
+    return bass_chroma
 
 
-def desambiguar_resultado(
-    resultado_global: ResultadoTonalidade,
-    resultado_frames: ResultadoTonalidade,
-    resultado_inicio: ResultadoTonalidade,
-    resultado_final: ResultadoTonalidade,
-    chroma_bass: np.ndarray | None = None,
-) -> ResultadoTonalidade:
+def disambiguate_result(
+    global_result: KeyResult,
+    frame_result: KeyResult,
+    start_result: KeyResult,
+    end_result: KeyResult,
+    bass_chroma: np.ndarray | None = None,
+) -> KeyResult:
     """
-    Combina todas as evidências para produzir o resultado final.
+    Combine all evidence to produce the final result.
 
-    Pesos:
-    - Ensemble global: 3 votos
-    - Votação por frames: 3 votos
-    - Início da música: 1 voto
-    - Final da música: 2 votos (fim é mais forte indicador de tônica)
-    - Baixo: 1 voto (se disponível)
+    Weights:
+    - Global ensemble:  3 votes
+    - Frame voting:     3 votes
+    - Track start:      1 vote
+    - Track end:        2 votes (ending is a stronger tonic indicator)
+    - Bass register:    1 vote  (if available)
     """
-    votos_pesados: list[str] = []
+    weighted_votes: list[str] = []
 
-    votos_pesados.extend([resultado_global.tom] * 3)
-    votos_pesados.extend([resultado_frames.tom] * 3)
-    votos_pesados.extend([resultado_inicio.tom] * 1)
-    votos_pesados.extend([resultado_final.tom] * 2)
+    weighted_votes.extend([global_result.key] * 3)
+    weighted_votes.extend([frame_result.key] * 3)
+    weighted_votes.extend([start_result.key] * 1)
+    weighted_votes.extend([end_result.key] * 2)
 
-    # Análise do baixo como desempate
-    if chroma_bass is not None:
-        bass_sum = np.sum(chroma_bass, axis=1)
-        nota_bass_idx = int(np.argmax(bass_sum))
-        # Vota no tom que tem essa nota como tônica
-        votos_pesados.append(f"{NOTAS[nota_bass_idx]} Major")
-        votos_pesados.append(f"{NOTAS[nota_bass_idx]} Minor")
+    # Bass as tie-breaker
+    if bass_chroma is not None:
+        bass_sum = np.sum(bass_chroma, axis=1)
+        bass_note_idx = int(np.argmax(bass_sum))
+        # Vote for the key whose tonic matches the dominant bass note
+        weighted_votes.append(f"{NOTES[bass_note_idx]} Major")
+        weighted_votes.append(f"{NOTES[bass_note_idx]} Minor")
 
-    contagem = Counter(votos_pesados)
-    candidatos = contagem.most_common(4)
+    count = Counter(weighted_votes)
+    candidates = count.most_common(4)
 
-    vencedor = candidatos[0][0]
-    total = sum(c for _, c in candidatos)
-    confianca = candidatos[0][1] / total
+    winner = candidates[0][0]
+    total = sum(c for _, c in candidates)
+    confidence = candidates[0][1] / total
 
-    # Se os dois primeiros são relativos (ex: C Major e A Minor),
-    # usa o baixo e os endpoints para decidir
-    if len(candidatos) >= 2:
-        segundo = candidatos[1][0]
-        if _RELATIVOS.get(vencedor) == segundo or _RELATIVOS.get(segundo) == vencedor:
-            # Verifica qual tônica aparece mais nos endpoints e no baixo
-            pontos_v = 0
-            pontos_s = 0
+    # If the top two candidates are relatives (e.g. C Major and A Minor),
+    # use the bass and endpoints to decide
+    if len(candidates) >= 2:
+        second = candidates[1][0]
+        if _RELATIVES.get(winner) == second or _RELATIVES.get(second) == winner:
+            points_winner = 0
+            points_second = 0
 
-            # Endpoints favorecem o final (convenção tonal: terminar na tônica)
-            if resultado_final.tom == vencedor:
-                pontos_v += 2
-            elif resultado_final.tom == segundo:
-                pontos_s += 2
+            # Endpoints favor the ending (tonal convention: resolve to tonic)
+            if end_result.key == winner:
+                points_winner += 2
+            elif end_result.key == second:
+                points_second += 2
 
-            if resultado_inicio.tom == vencedor:
-                pontos_v += 1
-            elif resultado_inicio.tom == segundo:
-                pontos_s += 1
+            if start_result.key == winner:
+                points_winner += 1
+            elif start_result.key == second:
+                points_second += 1
 
-            # Baixo: a tônica deve ser a nota mais proeminente no registro grave
-            if chroma_bass is not None:
-                bass_sum = np.sum(chroma_bass, axis=1)
-                tonica_v = NOTAS.index(vencedor.split()[0])
-                tonica_s = NOTAS.index(segundo.split()[0])
-                if bass_sum[tonica_v] > bass_sum[tonica_s]:
-                    pontos_v += 1
+            # Bass: the tonic should be the most prominent note in the bass
+            if bass_chroma is not None:
+                bass_sum = np.sum(bass_chroma, axis=1)
+                tonic_winner = NOTES.index(winner.split()[0])
+                tonic_second = NOTES.index(second.split()[0])
+                if bass_sum[tonic_winner] > bass_sum[tonic_second]:
+                    points_winner += 1
                 else:
-                    pontos_s += 1
+                    points_second += 1
 
-            if pontos_s > pontos_v:
-                vencedor = segundo
-                confianca = candidatos[1][1] / total
+            if points_second > points_winner:
+                winner = second
+                confidence = candidates[1][1] / total
 
-    # Combina correlações do resultado global
-    resultado_final_r = ResultadoTonalidade(
-        tom=vencedor,
-        confianca=confianca,
-        correlacoes=resultado_global.correlacoes,
-        votos_perfis=resultado_global.votos_perfis,
-        votos_frames=resultado_frames.votos_frames,
+    return KeyResult(
+        key=winner,
+        confidence=confidence,
+        correlations=global_result.correlations,
+        profile_votes=global_result.profile_votes,
+        frame_votes=frame_result.frame_votes,
     )
-    return resultado_final_r

@@ -15,6 +15,8 @@ jobs:
   benchmark:
     name: Performance Benchmark
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - uses: actions/checkout@v4
@@ -59,12 +61,12 @@ jobs:
         run: |
           python - <<'EOF'
           import time
-          from music_analyzer import analisar_musica
+          from music_analyzer import analyze_track
 
           times = []
           for _ in range(3):
               start = time.perf_counter()
-              analisar_musica("benchmark_reference.wav")
+              analyze_track("benchmark_reference.wav")
               times.append(time.perf_counter() - start)
 
           avg = sum(times) / len(times)
@@ -89,12 +91,12 @@ jobs:
           python - <<'EOF'
           import sys, time
           sys.path.insert(0, "main_branch")
-          from music_analyzer import analisar_musica
+          from music_analyzer import analyze_track
 
           times = []
           for _ in range(3):
               start = time.perf_counter()
-              analisar_musica("benchmark_reference.wav")
+              analyze_track("benchmark_reference.wav")
               times.append(time.perf_counter() - start)
 
           avg = sum(times) / len(times)
@@ -120,7 +122,7 @@ jobs:
                   : 'Minor change';
 
             const body = [
-              '## Benchmark Results',
+              '## Benchmark Results — ExcaliBPM',
               '',
               '| Branch | Avg. analysis time (60s file, 3 runs) |',
               '|--------|---------------------------------------|',

@@ -1,52 +1,52 @@
 """
-Perfis de tonalidade para detecção de tom musical.
+Key profiles for musical key detection.
 
-Contém 7 conjuntos de perfis validados pela literatura acadêmica,
-cada um otimizado para diferentes gêneros e contextos.
-Os valores representam a importância relativa de cada nota cromática
-(C, C#, D, D#, E, F, F#, G, G#, A, A#, B) dentro de uma escala.
+Contains 7 validated profile sets from academic literature,
+each optimized for different genres and contexts.
+Values represent the relative importance of each chromatic pitch
+(C, C#, D, D#, E, F, F#, G, G#, A, A#, B) within a scale.
 """
 
 import numpy as np
 
 PROFILES: dict[str, dict[str, list[float]]] = {
     # ── Krumhansl-Kessler (1990) ─────────────────────────────────
-    # Origem: experimentos perceptuais com probe-tone.
-    # Bom para: trechos clássicos curtos.
-    # Fraqueza: propenso a confusão com a dominante (5ª).
+    # Origin: probe-tone perceptual experiments.
+    # Good for: short classical excerpts.
+    # Weakness: prone to confusion with the dominant (5th).
     "krumhansl_kessler": {
         "major": [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88],
         "minor": [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17],
     },
 
     # ── Temperley CBMS (2007) ────────────────────────────────────
-    # Origem: Music and Probability, p.86.
-    # Bom para: uso geral, boa separação maior/menor.
+    # Origin: Music and Probability, p.86.
+    # Good for: general use, good major/minor separation.
     "temperley": {
         "major": [5.0, 2.0, 3.5, 2.0, 4.5, 4.0, 2.0, 4.5, 2.0, 3.5, 1.5, 4.0],
         "minor": [5.0, 2.0, 3.5, 4.5, 2.0, 4.0, 2.0, 4.5, 3.5, 2.0, 1.5, 4.0],
     },
 
     # ── Temperley / Kostka-Payne ─────────────────────────────────
-    # Origem: corpus de análises do livro Kostka-Payne.
-    # Bom para: música clássica. Alta precisão em modo maior.
+    # Origin: corpus of analyses from the Kostka-Payne textbook.
+    # Good for: classical music, high accuracy in major mode.
     "kostka_payne": {
         "major": [0.748, 0.060, 0.488, 0.082, 0.670, 0.460, 0.096, 0.715, 0.104, 0.366, 0.057, 0.400],
         "minor": [0.712, 0.084, 0.474, 0.618, 0.049, 0.460, 0.105, 0.747, 0.404, 0.067, 0.133, 0.330],
     },
 
     # ── Bellman-Budge (2005) ─────────────────────────────────────
-    # Origem: estudo de frequência de acordes de Budge (1943).
-    # Bom para: MENOR tendência a confusão com tons vizinhos.
-    # Recomendado como perfil padrão principal.
+    # Origin: Budge (1943) chord frequency study.
+    # Good for: LOWER tendency to confuse neighboring keys.
+    # Recommended as the primary default profile.
     "bellman_budge": {
         "major": [16.80, 0.86, 12.95, 1.41, 13.49, 11.93, 1.25, 20.28, 1.80, 8.04, 0.62, 10.57],
         "minor": [18.16, 0.69, 12.99, 13.34, 1.07, 11.15, 1.38, 21.07, 7.49, 1.53, 0.92, 10.21],
     },
 
     # ── Aarden / Essen (2003) ────────────────────────────────────
-    # Origem: Essen Folk Song Collection.
-    # Bom para: música folk, altíssima precisão em modo menor.
+    # Origin: Essen Folk Song Collection.
+    # Good for: folk music, very high accuracy in minor mode.
     "aarden_essen": {
         "major": [17.7661, 0.145624, 14.9265, 0.160186, 19.8049, 11.3587, 0.291248,
                   22.062, 0.145624, 8.15494, 0.232998, 4.95122],
@@ -55,24 +55,24 @@ PROFILES: dict[str, dict[str, list[float]]] = {
     },
 
     # ── Simple / Sapp (2011) ─────────────────────────────────────
-    # Pesos binários: 2=tônica/dominante, 1=diatônica, 0=cromática.
-    # Surpreendentemente eficaz para regiões longas de música.
+    # Binary weights: 2=tonic/dominant, 1=diatonic, 0=chromatic.
+    # Surprisingly effective for long musical passages.
     "simple_sapp": {
         "major": [2, 0, 1, 0, 1, 1, 0, 2, 0, 1, 0, 1],
         "minor": [2, 0, 1, 1, 0, 1, 0, 2, 1, 0, 0.5, 0.5],
     },
 
     # ── Albrecht-Shanahan (2013) ─────────────────────────────────
-    # Treinado via rede neural em 490 peças.
-    # Melhor precisão em modo menor de todos os perfis.
-    # NOTA: funciona melhor com distância euclidiana.
+    # Trained via neural network on 490 pieces.
+    # Best minor-mode accuracy of all profiles.
+    # NOTE: works best with Euclidean distance.
     "albrecht_shanahan": {
         "major": [0.238, 0.006, 0.111, 0.006, 0.137, 0.094, 0.016, 0.214, 0.009, 0.080, 0.008, 0.081],
         "minor": [0.220, 0.006, 0.104, 0.123, 0.019, 0.103, 0.012, 0.214, 0.062, 0.022, 0.061, 0.052],
     },
 }
 
-# ── Perfis Shaath — otimizados para música eletrônica/pop ────────
+# ── Shaath profiles — optimized for electronic/pop music ────────
 PROFILES_EDM: dict[str, dict[str, list[float]]] = {
     "shaath": {
         "major": [0.95162, 0.20742, 0.71758, 0.22007, 0.71341, 0.48841, 0.31431,
@@ -84,7 +84,7 @@ PROFILES_EDM: dict[str, dict[str, list[float]]] = {
 
 
 def get_all_profiles() -> dict[str, dict[str, np.ndarray]]:
-    """Retorna todos os perfis (gerais + EDM) como arrays numpy normalizados."""
+    """Return all profiles (general + EDM) as normalized numpy arrays."""
     combined = {**PROFILES, **PROFILES_EDM}
     result = {}
     for name, modes in combined.items():
