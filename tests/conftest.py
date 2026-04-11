@@ -5,7 +5,7 @@ Shared fixtures across all tests.
 import numpy as np
 import pytest
 
-from music_analyzer.models import MusicAnalysis
+from excalibpm.models import MusicAnalysis
 
 
 # ── Synthetic chroma vectors ─────────────────────────────────────────────────

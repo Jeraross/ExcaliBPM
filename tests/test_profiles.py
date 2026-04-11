@@ -4,7 +4,7 @@ Tests for music_analyzer.profiles — key detection profiles.
 
 import numpy as np
 
-from music_analyzer.profiles import PROFILES, PROFILES_EDM, get_all_profiles
+from excalibpm.profiles import PROFILES, PROFILES_EDM, get_all_profiles
 
 
 class TestProfilesStructure:

@@ -4,7 +4,7 @@ Tests for music_analyzer.key_detect — key detection engine.
 
 import numpy as np
 
-from music_analyzer.key_detect import (
+from excalibpm.key_detect import (
     KeyResult,
     _euclidean_similarity,
     _pearson_correlation,
@@ -13,7 +13,7 @@ from music_analyzer.key_detect import (
     ensemble_vote,
     frame_vote,
 )
-from music_analyzer.profiles import get_all_profiles
+from excalibpm.profiles import get_all_profiles
 
 
 # ── _pearson_correlation ─────────────────────────────────────────────────────

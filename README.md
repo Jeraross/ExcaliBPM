@@ -52,7 +52,7 @@ ExcaliBPM/
 │   ├── Runaway.wav
 │   ├── notRight.wav
 │   └── theSpins.wav
-├── music_analyzer/             # Core package
+├── excalibpm/                  # Core package
 │   ├── __init__.py             # Public API
 │   ├── core.py                 # Main orchestrator
 │   ├── chroma.py               # Chromagram extraction pipeline

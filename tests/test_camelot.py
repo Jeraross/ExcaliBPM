@@ -2,7 +2,7 @@
 Tests for music_analyzer.camelot — Camelot wheel logic.
 """
 
-from music_analyzer.camelot import (
+from excalibpm.camelot import (
     _circular_distance,
     compatibility,
     get_camelot,
@@ -27,7 +27,7 @@ class TestGetCamelot:
         assert get_camelot("X Unknown") is None
 
     def test_all_24_keys_mapped(self):
-        from music_analyzer.camelot import KEY_TO_CAMELOT
+        from excalibpm.camelot import KEY_TO_CAMELOT
         assert len(KEY_TO_CAMELOT) == 24
 
 
@@ -44,7 +44,7 @@ class TestGetOpenkey:
         assert get_openkey("Xpto") is None
 
     def test_all_24_keys_mapped(self):
-        from music_analyzer.camelot import KEY_TO_OPENKEY
+        from excalibpm.camelot import KEY_TO_OPENKEY
         assert len(KEY_TO_OPENKEY) == 24
 
 

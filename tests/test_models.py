@@ -2,7 +2,7 @@
 Tests for music_analyzer.models — MusicAnalysis dataclass.
 """
 
-from music_analyzer.models import MusicAnalysis
+from excalibpm.models import MusicAnalysis
 
 
 class TestMusicAnalysisStr:

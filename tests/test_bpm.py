@@ -8,7 +8,7 @@ The remaining tests cover normalization logic and edge cases.
 
 import numpy as np
 
-from music_analyzer.bpm import detect_bpm
+from excalibpm.bpm import detect_bpm
 
 
 class TestDetectBpmNormalization:

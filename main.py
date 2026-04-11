@@ -13,7 +13,7 @@ import json
 import sys
 import os
 
-from music_analyzer import (
+from excalibpm import (
     analyze_track,
     compatibility,
     suggest_next,
