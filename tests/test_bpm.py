@@ -111,6 +111,6 @@ class TestBpmNormalization:
         # 360 / 2 = 180, which satisfies the bpm <= 180 condition, so the loop stops
         assert self._run_with_patched_raw_bpm(360.0) == 180.0
 
-    def test_15_bpm_halved_four_times(self):
+    def test_15_bpm_doubled_four_times(self):
         result = self._run_with_patched_raw_bpm(15.0)
         assert 60.0 <= result <= 180.0
