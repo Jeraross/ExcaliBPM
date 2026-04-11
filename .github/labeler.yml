@@ -1,0 +1,43 @@
+algorithm:
+  - changed-files:
+      - any-glob-to-any-file:
+          - music_analyzer/key_detect.py
+          - music_analyzer/profiles.py
+          - music_analyzer/chroma.py
+          - music_analyzer/bpm.py
+
+camelot:
+  - changed-files:
+      - any-glob-to-any-file:
+          - music_analyzer/camelot.py
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - requirements.txt
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/**
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "*.md"
+          - .github/SECURITY.md
+
+cli:
+  - changed-files:
+      - any-glob-to-any-file:
+          - main.py
+
+models:
+  - changed-files:
+      - any-glob-to-any-file:
+          - music_analyzer/models.py
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - tests/**

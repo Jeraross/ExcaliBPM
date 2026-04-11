@@ -1,0 +1,141 @@
+name: Benchmark
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "music_analyzer/**"
+      - "requirements.txt"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  benchmark:
+    name: Performance Benchmark
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-3.11-${{ hashFiles('requirements.txt') }}
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate reference audio file
+        run: |
+          python - <<'EOF'
+          import numpy as np
+          import soundfile as sf
+
+          # 60-second sine wave at 440 Hz (A4) — deterministic reference file
+          sr = 44100
+          duration = 60
+          t = np.linspace(0, duration, sr * duration, endpoint=False)
+          signal = 0.5 * np.sin(2 * np.pi * 440 * t)
+          sf.write("benchmark_reference.wav", signal, sr)
+          print("Reference audio generated: benchmark_reference.wav")
+          EOF
+
+      - name: Run benchmark on PR branch
+        run: |
+          python - <<'EOF'
+          import time
+          from music_analyzer import analisar_musica
+
+          times = []
+          for _ in range(3):
+              start = time.perf_counter()
+              analisar_musica("benchmark_reference.wav")
+              times.append(time.perf_counter() - start)
+
+          avg = sum(times) / len(times)
+          print(f"PR_AVG={avg:.3f}")
+
+          with open("benchmark_pr.txt", "w") as f:
+              f.write(f"{avg:.3f}")
+          EOF
+
+      - name: Checkout main for comparison
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main_branch
+
+      - name: Install main branch dependencies
+        run: |
+          pip install -r main_branch/requirements.txt --quiet
+
+      - name: Run benchmark on main branch
+        run: |
+          python - <<'EOF'
+          import sys, time
+          sys.path.insert(0, "main_branch")
+          from music_analyzer import analisar_musica
+
+          times = []
+          for _ in range(3):
+              start = time.perf_counter()
+              analisar_musica("benchmark_reference.wav")
+              times.append(time.perf_counter() - start)
+
+          avg = sum(times) / len(times)
+          with open("benchmark_main.txt", "w") as f:
+              f.write(f"{avg:.3f}")
+          EOF
+
+      - name: Compare and comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const pr_time = parseFloat(fs.readFileSync('benchmark_pr.txt', 'utf8'));
+            const main_time = parseFloat(fs.readFileSync('benchmark_main.txt', 'utf8'));
+            const diff = ((pr_time - main_time) / main_time) * 100;
+            const sign = diff >= 0 ? '+' : '';
+            const status = Math.abs(diff) < 5
+              ? 'No significant change'
+              : diff > 15
+                ? 'Regression detected'
+                : diff < -5
+                  ? 'Performance improved'
+                  : 'Minor change';
+
+            const body = [
+              '## Benchmark Results',
+              '',
+              '| Branch | Avg. analysis time (60s file, 3 runs) |',
+              '|--------|---------------------------------------|',
+              `| \`main\` | ${main_time}s |`,
+              `| This PR | ${pr_time}s |`,
+              `| Delta | ${sign}${diff.toFixed(1)}% — ${status} |`,
+              '',
+              diff > 15
+                ? '> **Warning:** This PR introduces a performance regression above 15%. Please review the changes in `chroma.py`, `key_detect.py`, or `profiles.py`.'
+                : '> Performance is within acceptable range.',
+            ].join('\n');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
