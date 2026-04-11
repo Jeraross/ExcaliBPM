@@ -39,19 +39,6 @@ engine tells you instantly whether two tracks will blend harmonically.
 
 ```
 ExcaliBPM/
-├── .github/
-│   ├── labeler.yml
-│   └── workflows/
-│       ├── auto-label.yml      # Automatic PR labeling
-│       ├── benchmark.yml       # Performance regression check on PRs
-│       ├── ci.yml              # Lint + test matrix (Python 3.10–3.12)
-│       ├── release.yml         # GitHub Release on version tags
-│       ├── security.yml        # CodeQL static analysis
-│       └── stale.yml           # Auto-close inactive issues/PRs
-├── Musics/                     # Sample audio files for manual testing
-│   ├── Runaway.wav
-│   ├── notRight.wav
-│   └── theSpins.wav
 ├── music_analyzer/             # Core package
 │   ├── __init__.py             # Public API
 │   ├── core.py                 # Main orchestrator
