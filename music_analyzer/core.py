@@ -9,7 +9,7 @@ import numpy as np
 import librosa
 import concurrent.futures
 
-from .chroma import pipeline_chroma, extrair_harmonico
+from .chroma import pipeline_chroma
 from .key_detect import (
     ensemble_votar,
     votacao_por_frames,

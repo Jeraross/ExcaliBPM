@@ -86,7 +86,7 @@ Exemplos:
             print(r)
 
             if args.debug:
-                print(f"\n  Votos por perfil:")
+                print("\n  Votos por perfil:")
                 for perfil, tom in r.votos_perfis.items():
                     print(f"    {perfil:<25} → {tom}")
                 if r.votos_frames:
@@ -122,7 +122,7 @@ Exemplos:
                 resultados.append(r_b)
             else:
                 print(f"\n{'─' * 56}")
-                print(f"  COMPATIBILIDADE PARA TRANSIÇÃO")
+                print("  COMPATIBILIDADE PARA TRANSIÇÃO")
                 print(f"{'─' * 56}")
                 print(f"  {r_a.arquivo}")
                 print(f"    Tom final: {r_a.tonalidade_final} ({r_a.camelot_final})")

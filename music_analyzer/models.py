@@ -55,7 +55,7 @@ class AnaliseMusical:
 
         linhas = [
             f"{'═' * 56}",
-            f"  ANÁLISE MUSICAL",
+            "  ANÁLISE MUSICAL",
             f"  {self.arquivo}" if self.arquivo else "",
             f"{'═' * 56}",
             f"  Duração        : {minutos}:{segundos:02d}",
@@ -66,7 +66,7 @@ class AnaliseMusical:
             f"  Tom Final      : {self.tonalidade_final:<14} │ {self.camelot_final:<4} │ {self.confianca_final:.0%}",
             f"{'═' * 56}",
         ]
-        return "\n".join(l for l in linhas if l)
+        return "\n".join(line for line in linhas if line)
 
     def to_dict(self) -> dict:
         """Serialização para JSON."""
