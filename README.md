@@ -39,41 +39,29 @@ engine tells you instantly whether two tracks will blend harmonically.
 
 ```
 ExcaliBPM/
-<<<<<<< HEAD
-├── .github/
-│   ├── labeler.yml
-│   └── workflows/
-│       ├── auto-label.yml      # Automatic PR labeling
-│       ├── benchmark.yml       # Performance regression check on PRs
-│       ├── ci.yml              # Lint + test matrix (Python 3.10–3.12)
-│       ├── release.yml         # GitHub Release on version tags
-│       ├── security.yml        # CodeQL static analysis
-│       └── stale.yml           # Auto-close inactive issues/PRs
-├── Musics/                     # Sample audio files for manual testing
-│   ├── Runaway.wav
-│   ├── notRight.wav
-│   └── theSpins.wav
 ├── excalibpm/                  # Core package
-=======
-├── music_analyzer/             # Core package
->>>>>>> 9932ac9735cfcfcc5e731226979777c2647b8ec4
-│   ├── __init__.py             # Public API
-│   ├── core.py                 # Main orchestrator
+│   ├── __init__.py             # Public API (v2.0.0)
+│   ├── core.py                 # Main orchestrator + smart input router
 │   ├── chroma.py               # Chromagram extraction pipeline
 │   ├── key_detect.py           # Key detection algorithms
 │   ├── bpm.py                  # BPM detection
 │   ├── camelot.py              # Camelot Wheel + compatibility engine
 │   ├── models.py               # Result dataclasses
-│   └── profiles.py             # 8 key profile sets
+│   ├── profiles.py             # 8 key profile sets
+│   └── spotify.py              # Spotify integration (optional)
 ├── tests/                      # Test suite
-│   ├── conftest.py             # Shared fixtures (synthetic chroma, sample analysis)
+│   ├── conftest.py             # Shared fixtures + spotdl availability check
 │   ├── test_bpm.py
 │   ├── test_camelot.py
 │   ├── test_key_detect.py
 │   ├── test_models.py
-│   └── test_profiles.py
+│   ├── test_profiles.py
+│   ├── test_spotify_unit.py    # No network required
+│   └── test_spotify_integration.py  # Requires spotdl + ffmpeg + internet
 ├── main.py                     # Command-line interface
-├── requirements.txt
+├── requirements.txt            # Core dependencies
+├── requirements-spotify.txt    # Optional Spotify dependencies
+├── pytest.ini
 ├── README.md
 └── SECURITY.md
 ```
@@ -83,8 +71,29 @@ ExcaliBPM/
 ## Installation
 
 ```bash
+# Core (key + BPM analysis of local files)
 pip install -r requirements.txt
+
+# + Spotify integration
+pip install -r requirements-spotify.txt   # installs spotdl
+# Also requires ffmpeg:
+#   Ubuntu/Debian:  sudo apt install ffmpeg
+#   macOS:          brew install ffmpeg
+#   Windows:        choco install ffmpeg
 ```
+
+---
+
+## Dependencies
+
+| Dependency | Required? | Purpose |
+|------------|-----------|---------|
+| librosa, numpy, scipy, soundfile | Always | Core audio analysis |
+| spotdl | Spotify only | Download audio from Spotify |
+| ffmpeg | Spotify only | Audio format conversion |
+
+Core key/BPM analysis works without spotdl or ffmpeg. Only raise errors
+when you actually call `analyze()` with a Spotify URL.
 
 ---
 
@@ -109,12 +118,40 @@ python main.py track.wav --debug
 
 ---
 
+## CLI Spotify Examples
+
+```bash
+# Verify spotdl and ffmpeg are ready
+python main.py --check-deps
+
+# Download + analyze a single track (temp mode — auto-deleted after analysis)
+python main.py https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC
+
+# Analyze a full playlist, keep a local cache
+python main.py https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M \
+    --cache-dir /tmp/spotify_cache --json
+
+# Compatibility check: local file vs Spotify URL
+python main.py track_a.wav \
+    --compatible-with https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC
+
+# Keep downloaded files in a permanent library
+python main.py https://open.spotify.com/album/1DFixLWuPkv3KT3TnV35m3 \
+    --keep-downloads --output-dir ~/Music/library
+
+# Show and manage cache
+python main.py --cache-info --cache-dir /tmp/spotify_cache
+python main.py --cache-clear --cache-dir /tmp/spotify_cache
+```
+
+---
+
 ## Library Usage
 
 ```python
-from music_analyzer import analyze_track, compatibility, suggest_next
+from excalibpm import analyze_track, compatibility, suggest_next
 
-# Full analysis
+# Full analysis of a local file
 result = analyze_track("track.wav")
 print(result)
 print(result.to_dict())  # Ready for JSON / API responses
@@ -132,6 +169,60 @@ suggestions = suggest_next(track_a.key)
 for s in suggestions:
     print(f"{s['camelot']}  {s['key']}  —  {s['level']}")
 ```
+
+---
+
+## Spotify Integration
+
+> **Requires:** `pip install spotdl` and `ffmpeg` in your PATH.
+
+```python
+from excalibpm import analyze, SpotifyConfig
+
+# Single track — returns MusicAnalysis
+result = analyze("https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC")
+print(result.key, result.bpm, result.camelot)
+
+# Playlist — returns list[MusicAnalysis]
+results = analyze("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M")
+for r in results:
+    print(r.key, r.bpm, r.spotify_url)
+
+# With SpotifyConfig (cache mode)
+config = SpotifyConfig(cache_dir="/tmp/spotify_cache", cache_max_mb=1000)
+result = analyze(
+    "https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC",
+    spotify_config=config,
+)
+
+# With progress callback
+def on_progress(msg, current, total):
+    print(f"[{current}/{total}] {msg}")
+
+result = analyze(
+    "https://open.spotify.com/album/1DFixLWuPkv3KT3TnV35m3",
+    on_progress=on_progress,
+)
+```
+
+---
+
+## Storage Modes
+
+| Mode | How to enable | Behavior |
+|------|--------------|----------|
+| **Temp** (default) | `SpotifyConfig()` | Downloads to a tmpdir, deleted on exit. Zero disk footprint. |
+| **Cache** | `SpotifyConfig(cache_dir="/path")` | Persistent LRU cache. Skip download on hit. Configurable size limit. |
+| **Keep** | `SpotifyConfig(keep_files=True, output_dir="/path")` | Download to output_dir, never delete. Build a local library. |
+
+Use **temp mode** for one-off analysis. Use **cache mode** when you repeatedly
+analyze the same tracks. Use **keep mode** to build a permanent local library.
+
+---
+
+> **Disclaimer:** Downloading copyrighted content may violate the Spotify Terms
+> of Service. This tool is intended for educational purposes. Support artists by
+> purchasing their music.
 
 ---
 
@@ -174,7 +265,7 @@ print(json.dumps(result.to_dict(), indent=2))
   "key_start": "A Minor",
   "key_end": "A Minor"
 }
-```
+``` 
 
 To evaluate whether two tracks will transition cleanly, compare the **end key**
 of the outgoing track against the **start key** of the incoming one:

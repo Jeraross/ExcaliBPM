@@ -2,10 +2,26 @@
 Shared fixtures across all tests.
 """
 
+import subprocess
+
 import numpy as np
 import pytest
 
 from excalibpm.models import MusicAnalysis
+
+
+# ── spotdl availability ──────────────────────────────────────────────────────
+
+def _spotdl_available() -> bool:
+    try:
+        r = subprocess.run(["spotdl", "--version"], capture_output=True, timeout=10)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+spotdl_available = _spotdl_available()
+slow = pytest.mark.slow
 
 
 # ── Synthetic chroma vectors ─────────────────────────────────────────────────

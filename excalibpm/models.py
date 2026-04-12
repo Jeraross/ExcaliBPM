@@ -33,6 +33,9 @@ class MusicAnalysis:
     profile_votes: dict[str, str] = field(default_factory=dict)
     frame_votes: list[str] = field(default_factory=list)
 
+    # Optional Spotify source URL
+    spotify_url: str = ""
+
     @property
     def camelot(self) -> str:
         return get_camelot(self.key) or "?"
@@ -72,6 +75,7 @@ class MusicAnalysis:
         """Serialize to a JSON-compatible dictionary."""
         return {
             "file": self.file,
+            "spotify_url": self.spotify_url or None,
             "duration_seconds": round(self.duration_seconds, 2),
             "bpm": self.bpm,
             "key": self.key,

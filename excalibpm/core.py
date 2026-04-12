@@ -3,11 +3,17 @@ Main analysis orchestrator.
 
 Coordinates all modules (chroma, key_detect, bpm, camelot) to
 produce a complete and robust analysis of an audio track.
+
+The Spotify integration (spotify.py) is imported lazily inside analyze()
+so that users who do not need Spotify never encounter spotdl import errors.
 """
+
+from __future__ import annotations
 
 import numpy as np
 import librosa
 import concurrent.futures
+from typing import Callable, Union
 
 from .chroma import chroma_pipeline
 from .key_detect import (
@@ -149,18 +155,100 @@ def analyze_track(
 def analyze_batch(
     paths: list[str],
     sr: int = 22050,
+    spotify_config=None,
+    on_progress: Callable[[str, int, int], None] | None = None,
 ) -> list[MusicAnalysis]:
     """
-    Analyze multiple tracks sequentially.
+    Analyze multiple tracks sequentially. Accepts mixed inputs (file paths
+    and Spotify URLs).
 
     For true inter-track parallelism, use ProcessPoolExecutor
     externally (each track already uses threads internally).
     """
     results = []
-    for path in paths:
+    total = len(paths)
+    for i, path in enumerate(paths):
+        if on_progress:
+            on_progress(f"Analyzing {i + 1}/{total}: {path}", i, total)
         try:
-            r = analyze_track(path, sr=sr)
-            results.append(r)
+            r = analyze(path, spotify_config=spotify_config)
+            if isinstance(r, list):
+                results.extend(r)
+            else:
+                results.append(r)
         except Exception as e:
             print(f"  ERROR in {path}: {e}")
+    return results
+
+
+def analyze(
+    input: str,
+    spotify_config=None,
+    on_progress: Callable[[str, int, int], None] | None = None,
+) -> Union[MusicAnalysis, list[MusicAnalysis]]:
+    """
+    Smart input router: analyze a local file or a Spotify URL.
+
+    - Local file path → calls analyze_track() directly.
+    - Spotify track URL → downloads, analyzes, cleans up; returns MusicAnalysis.
+    - Spotify album/playlist URL → downloads all tracks, returns list[MusicAnalysis].
+
+    The on_progress callback receives (message, current, total).
+
+    spotify_config is a SpotifyConfig instance (or None for defaults).
+    Spotify dependencies (spotdl, ffmpeg) are only required when a Spotify
+    URL is passed — local file analysis never needs them.
+    """
+    import os
+
+    # Lazy import: spotify.py is never loaded for local-file-only workflows.
+    from .spotify import is_spotify_url, SpotifySession, SpotifyConfig
+
+    if not is_spotify_url(input):
+        # Local file path
+        if on_progress:
+            on_progress(f"Analyzing: {input}", 0, 1)
+        result = analyze_track(input)
+        if on_progress:
+            on_progress(f"Done: {input}", 1, 1)
+        return result
+
+    # Spotify URL
+    config = spotify_config if spotify_config is not None else SpotifyConfig()
+
+    with SpotifySession(config) as session:
+        tracks = session.download(input, on_progress=on_progress)
+
+        results = []
+        total = len(tracks)
+        for i, track in enumerate(tracks):
+            if not track.success:
+                print(f"  SKIP {track.url}: {track.error}")
+                continue
+            if on_progress:
+                on_progress(
+                    f"Analyzing {track.artist} - {track.title}",
+                    i, total,
+                )
+            try:
+                r = analyze_track(track.local_path)
+                r.spotify_url = track.url
+                results.append(r)
+            except Exception as e:
+                print(f"  ERROR analyzing {track.local_path}: {e}")
+
+    # Classify URL to decide return type
+    from .spotify import classify_url
+    parsed = classify_url(input)
+    url_type = parsed[0] if parsed else "track"
+
+    if url_type == "track":
+        return results[0] if results else MusicAnalysis(
+            key="Unknown", key_confidence=0.0,
+            key_start="Unknown", start_confidence=0.0,
+            key_end="Unknown", end_confidence=0.0,
+            bpm=0.0, duration_seconds=0.0,
+            spotify_url=input,
+        )
+
     return results
