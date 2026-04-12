@@ -1,7 +1,6 @@
 # ExcaliBPM
 
 A high-precision audio analysis library built to help DJs make better mixing decisions.
-Developed by **Jera**.
 
 ---
 
@@ -118,7 +117,7 @@ python main.py track.wav --debug
 
 ---
 
-## CLI Spotify Examples
+## CLI Spotify Examples (W.I.P.)
 
 ```bash
 # Verify spotdl and ffmpeg are ready
@@ -172,7 +171,7 @@ for s in suggestions:
 
 ---
 
-## Spotify Integration
+## Spotify Integration (W.I.P.)
 
 > **Requires:** `pip install spotdl` and `ffmpeg` in your PATH.
 
