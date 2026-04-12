@@ -1,8 +1,0 @@
-#!C:\Users\jerin\Downloads\music_analyzer\music_analyzer\spot\Scripts\python.exe
-# -*- coding: UTF-8 -*-
-from __future__ import print_function, division, absolute_import
-
-from numba.misc.numba_entry import main
-
-if __name__ == "__main__":
-    main()
